@@ -2,9 +2,9 @@ name: Collect Berlin traffic
 
 on:
   workflow_dispatch:
-  
+
   schedule:
-    - cron: "7,22,37,52 * * * *"
+    - cron: "*/5 * * * *"
 
 permissions:
   contents: read
