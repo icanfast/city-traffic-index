@@ -4,6 +4,8 @@ from datetime import datetime, timezone
 
 import requests
 from botocore.exceptions import ClientError
+from requests.adapters import HTTPAdapter
+from urllib3.util import Retry
 
 
 FORECAST_URL = "https://api.open-meteo.com/v1/forecast"
@@ -34,10 +36,13 @@ def collect_belgrade_weather(s3, bucket):
         print("Belgrade weather is already archived for this hour.")
         return
 
-    response = requests.get(FORECAST_URL, params=REQUEST_PARAMS, timeout=(5, 20))
-    fetched_at = datetime.now(timezone.utc)
-    response.raise_for_status()
-    weather = response.json()
+    with requests.Session() as session:
+        retries = Retry(total=1, connect=1, read=1, status=0)
+        session.mount("https://", HTTPAdapter(max_retries=retries))
+        response = session.get(FORECAST_URL, params=REQUEST_PARAMS, timeout=(5, 20))
+        fetched_at = datetime.now(timezone.utc)
+        response.raise_for_status()
+        weather = response.json()
     if not isinstance(weather, dict):
         raise ValueError("Expected an Open-Meteo forecast object.")
     current = weather.get("current")
