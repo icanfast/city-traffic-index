@@ -10,28 +10,14 @@ import requests
 from botocore.exceptions import BotoCoreError, ClientError
 from dotenv import load_dotenv
 
+from collect_weather import collect_belgrade_weather
+
 
 # Bounding boxes are west, south, east, north. Belgrade covers roughly 20 by 20 km.
 CITY_BOUNDS = {
     "berlin": (13.268278, 52.419280, 13.561672, 52.599356),
     "belgrade": (20.320, 44.730, 20.575, 44.910),
 }
-
-
-def berlin_dispatch_slot():
-    # The worker dispatches near :07, :22, :37 and :52 UTC. Use the run's
-    # creation time so runner queueing cannot change which slots collect Berlin.
-    api = os.environ["GITHUB_API_URL"]
-    repo = os.environ["GITHUB_REPOSITORY"]
-    run_id = os.environ["GITHUB_RUN_ID"]
-    response = requests.get(
-        f"{api}/repos/{repo}/actions/runs/{run_id}",
-        headers={"Accept": "application/vnd.github+json"},
-        timeout=(3, 8),
-    )
-    response.raise_for_status()
-    created_at = datetime.fromisoformat(response.json()["created_at"]).astimezone(timezone.utc)
-    return created_at.minute % 30 < 15
 
 
 def fetch_here(bounds, api_key):
@@ -92,8 +78,8 @@ def collect_city(city, api_key, s3, bucket):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Collect HERE traffic flow into Cloudflare R2.")
-    parser.add_argument("--city", choices=CITY_BOUNDS, help="Collect a single city outside the workflow cadence.")
+    parser = argparse.ArgumentParser(description="Archive Belgrade traffic and hourly weather in Cloudflare R2.")
+    parser.add_argument("--city", choices=CITY_BOUNDS, help="Collect only traffic for the selected city.")
     args = parser.parse_args()
 
     load_dotenv()
@@ -106,25 +92,22 @@ def main():
         aws_secret_access_key=os.environ["R2_SECRET_ACCESS_KEY"],
         region_name="auto",
     )
-    cities = (args.city,) if args.city else CITY_BOUNDS
+    city = args.city or "belgrade"
     exit_code = 0
-    if args.city is None and os.environ.get("GITHUB_ACTIONS") == "true":
+    try:
+        collect_city(city, api_key, s3, bucket)
+    except RuntimeError as error:
+        print(f"{city} collection failed. {error}", file=sys.stderr)
+        exit_code = 1
+    except (BotoCoreError, ClientError) as error:
+        print(f"{city} R2 upload failed ({type(error).__name__}).", file=sys.stderr)
+        exit_code = 1
+
+    if args.city is None:
         try:
-            if not berlin_dispatch_slot():
-                cities = ("belgrade",)
-                print("Berlin is skipped in this slot. Belgrade collects every dispatch.")
-        except (requests.RequestException, KeyError, TypeError, ValueError) as error:
-            cities = ("belgrade",)
-            print(f"Could not read the dispatch time ({type(error).__name__}). Skipping Berlin this run.", file=sys.stderr)
-            exit_code = 1
-    for city in cities:
-        try:
-            collect_city(city, api_key, s3, bucket)
-        except RuntimeError as error:
-            print(f"{city} collection failed. {error}", file=sys.stderr)
-            exit_code = 1
-        except (BotoCoreError, ClientError) as error:
-            print(f"{city} R2 upload failed ({type(error).__name__}).", file=sys.stderr)
+            collect_belgrade_weather(s3, bucket)
+        except (requests.RequestException, BotoCoreError, ClientError, ValueError) as error:
+            print(f"Belgrade weather collection failed ({type(error).__name__}).", file=sys.stderr)
             exit_code = 1
     return exit_code
 
