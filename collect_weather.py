@@ -19,7 +19,7 @@ REQUEST_PARAMS = {
     "current": CURRENT_FIELDS,
     "hourly": FORECAST_FIELDS,
     "past_hours": 2,
-    "forecast_hours": 4,
+    "forecast_hours": 6,
 }
 
 

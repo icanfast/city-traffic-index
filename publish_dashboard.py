@@ -10,7 +10,7 @@ import zipfile
 from pathlib import Path
 
 
-RUNTIME_SHA256 = "2f99ada15f517bf7ae8dad09b486213f7f4013625c7613a650c68444bd3d98a7"
+RUNTIME_SHA256 = "8f37cd21cb846c20a2a3e0b80411204f6f675aa5d0ca13ba36abd712639ef992"
 RUNTIME_KEY = f"forecast/belgrade/v1/runtime-{RUNTIME_SHA256}.zip"
 
 
@@ -23,6 +23,7 @@ def publish_dashboard(s3, bucket):
 
     job_env = os.environ.copy()
     job_env.pop("HERE_API_KEY", None)
+    job_env["BELGRADE_RUNTIME_SHA256"] = RUNTIME_SHA256
     job_env["PIP_DISABLE_PIP_VERSION_CHECK"] = "1"
     job_env["PYTHONUNBUFFERED"] = "1"
     install_env = {key: value for key, value in job_env.items() if not key.startswith("R2_")}
