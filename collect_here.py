@@ -94,8 +94,10 @@ def main():
     )
     city = args.city or "belgrade"
     exit_code = 0
+    traffic_uploaded = False
     try:
         collect_city(city, api_key, s3, bucket)
+        traffic_uploaded = True
     except RuntimeError as error:
         print(f"{city} collection failed. {error}", file=sys.stderr)
         exit_code = 1
@@ -109,6 +111,15 @@ def main():
         except (requests.RequestException, BotoCoreError, ClientError, ValueError) as error:
             print(f"Belgrade weather collection failed ({type(error).__name__}).", file=sys.stderr)
             exit_code = 1
+
+    if traffic_uploaded and city == "belgrade" and os.getenv("GITHUB_ACTIONS") == "true":
+        from publish_dashboard import publish_dashboard
+
+        try:
+            publish_dashboard(s3, bucket)
+        except Exception as error:
+            # Preserve collection status so the archive keeps its existing behavior.
+            print(f"::warning::Dashboard refresh failed ({type(error).__name__}).", file=sys.stderr)
     return exit_code
 
 
