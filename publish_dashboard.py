@@ -10,7 +10,7 @@ import zipfile
 from pathlib import Path
 
 
-RUNTIME_SHA256 = "d83da16fbd16deb18359f98bccbbfde1eb2e6f2af70b96c0988dd8ff84aac2d5"
+RUNTIME_SHA256 = "762a078a3faafd9491b05ad675821cade53751581c9f1f268ee8d85fcb04e26b"
 RUNTIME_KEY = f"forecast/belgrade/v1/runtime-{RUNTIME_SHA256}.zip"
 
 
